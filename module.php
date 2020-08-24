@@ -162,6 +162,10 @@
 			$args['uri'] = rtrim($fqdn . '/' . $path, '/');
 			$args['proto'] = empty($opts['ssl']) ? 'http://' : 'https://';
 			$args['debug'] = is_debug() ? '-V' : null;
+			if (is_debug()) {
+				warn("Disabling debug mode as it causes a maxBuffer exceeded error");
+				$args['debug'] = null;
+			}
 			// use localhost.localdomain, which is an alias to 127.0.0.1;
 			// ghost looks for "mysqld" if dbhost is localhost or 127.0.0.1;
 			// this isn't present in a synthetic root
@@ -336,7 +340,7 @@
 		/**
 		 * Get installed version
 		 *
-		 * @param string $hostname
+		 * @param string $hostname or $docroot
 		 * @param string $path
 		 * @return string version number
 		 */
@@ -345,8 +349,12 @@
 			if (!$this->valid($hostname, $path)) {
 				return null;
 			}
-			$approot = $this->getAppRoot($hostname, $path);
-			$path = $this->domain_fs_path() . $approot . '/current/package.json';
+			if ($hostname[0] !== '/') {
+				$approot = $this->getAppRoot($hostname, $path);
+			} else {
+				$approot = Webapps\App\Loader::fromDocroot('ghost', $hostname, $this->getAuthContext())->getAppRoot();
+			}
+			$path = $this->domain_fs_path($approot . '/current/package.json');
 			clearstatcache(true, \dirname($path));
 			clearstatcache(true, $path);
 			if (!file_exists($path)) {
@@ -359,7 +367,7 @@
 		}
 
 		/**
-		 * Location is a valid WP install
+		 * Location is a valid Ghost install
 		 *
 		 * @param string $hostname or $docroot
 		 * @param string $path
@@ -370,6 +378,7 @@
 			if (!IS_CLI) {
 				return $this->query('ghost_valid', $hostname, $path);
 			}
+
 			if ($hostname[0] === '/') {
 				if (!($path = realpath($this->domain_fs_path($hostname)))) {
 					return false;
@@ -720,10 +729,14 @@
 					[],
 					['user' => $this->getDocrootUser($approot)]
 				);
+				if (is_debug()) {
+					warn("Disabling debug mode as it causes a maxBuffer exceeded error");
+					//is_debug() ? '-V' : null;
+				}
 				// @TODO update LTS?
 				if (!$this->_exec($approot, 'nvm exec ghost update %s --local -D --no-restart --no-color --v%d',
 					[
-						is_debug() ? '-V' : null,
+						null,
 						\Opcenter\Versioning::asMajor($oldversion)
 					])) {
 					return error('Failed to prep for major version upgrade');
