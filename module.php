@@ -251,7 +251,7 @@
 			}
 
 			$this->_exec($approot, 'npm install -g knex-migrator');
-			$ret = $this->_exec("${approot}/current", 'nvm exec knex-migrator init');
+			$ret = $this->_exec("${approot}/current", 'nvm exec knex-migrator init', ['NODE_VERSION' => $nodever]);
 			if (!$ret['success']) {
 				return error('Failed to create initial database configuration - knex-migrator failed: %s',
 					coalesce($ret['stderr'], $ret['stdout']));
@@ -301,7 +301,7 @@
 			return true;
 		}
 
-		private function _exec($path = null, $cmd, array $args = array())
+		private function _exec($path = null, $cmd, array $args = array(), $env = array())
 		{
 			// client may override tz, propagate to bin
 			if (!is_array($args)) {
@@ -316,12 +316,11 @@
 			}
 
 			$ret = $this->pman_run($cmd, $args,
-				[
+				$env + [
 					'NVM_DIR'  => $this->user_get_home($user),
 					'PATH'     => getenv('PATH') . PATH_SEPARATOR . '~/node_modules/.bin',
 					'NODE_ENV' => 'production'
 				], ['user' => $user]);
-
 			if (!strncmp(coalesce($ret['stderr'], $ret['stdout']), 'Error:', strlen('Error:'))) {
 				// move stdout to stderr on error for consistency
 				$ret['success'] = false;
@@ -505,7 +504,7 @@
 		private function migrate(string $approot, string $appenv = 'production'): bool
 		{
 			$this->linkConfiguration($approot, $appenv);
-			$ret = $this->_exec("${approot}/current", 'nvm exec knex-migrator migrate');
+			$ret = $this->_exec("${approot}/current", 'nvm exec knex-migrator migrate', [], ['NODE_VERSION' => $this->node_get_default($approot)]);
 
 			return $ret['success'] ?: error("failed to migrate database in `%s': %s", $approot,
 				coalesce($ret['stderr'], $ret['stdout']));
@@ -711,6 +710,7 @@
 			if ($oldversion === $version) {
 				return info("Ghost is already at current version `%s'", $version);
 			}
+
 			if (\Opcenter\Versioning::asMajor($version) !== \Opcenter\Versioning::asMajor($oldversion)) {
 				info('Major upgrade detected - updating ghost-cli, relaxing permissions');
 				// Permission requirements are insanely insecure... otherwise Ghost vomits.
@@ -732,20 +732,29 @@
 				return error('Ghost must be upgraded from terminal. Run the following command to use the migration assistant: ' .
 					'cd %s && env NODE_ENV=production nvm exec ghost update --local -f', $approot);
 			}
-
+			// force version assertion on incomplete upgrade
+			$this->assertLocalVersion($approot, $oldversion, $version);
 			// more bad permission requirements, -D bypasses chmod requirement
+
 			$cmd = 'nvm exec ghost update %(debug)s --no-restart -D --local --no-prompt --no-color %(version)s';
-			$args['debug'] = is_debug() ? '-V' : null;
+			// disable debug mode for now, causes stdout maxBuffer exceeded error
+			if (is_debug()) {
+				warn("Disabling debug mode as it causes a maxBuffer exceeded error");
+				//is_debug() ? '-V' : null;
+			}
+			$args['debug'] = null;
 			$args['version'] = $version;
 			$ret = $this->_exec($approot, $cmd, $args);
 			$this->fixSymlink($approot);
 			$this->file_touch("${approot}/tmp/restart.txt");
 
 			if (!$ret['success']) {
-				parent::setInfo($this->getDocumentRoot($hostname, $path), [
+				$this->setInfo($this->getDocumentRoot($hostname, $path), [
 					'version' => $this->get_version($hostname, $path),
 					'failed'  => true
 				]);
+
+				$this->assertLocalVersion($approot, $oldversion, $version);
 
 				return error('failed to update Ghost: %s', coalesce($ret['stderr'], $ret['stdout']));
 			}
@@ -755,12 +764,45 @@
 			if ($version !== ($newver = $this->get_version($hostname, $path))) {
 				report("Upgrade failed, reported version `%s' is not requested version `%s'", $newver, $version);
 			}
-			parent::setInfo($this->getDocumentRoot($hostname, $path), [
+			$this->setInfo($this->getDocumentRoot($hostname, $path), [
 				'version' => $newver,
 				'failed'  => !$ret
 			]);
 
 			return $ret;
+		}
+
+		/**
+		 * Assert local Ghost CLI version matches expected
+		 *
+		 * @param string $approot
+		 * @param string $version
+		 * @return bool true if assertion passes, false if change forced
+		 */
+		private function assertLocalVersion(string $approot, string $version, string $targetVersion = null): bool
+		{
+			$json = $this->file_get_file_contents($approot . '/.ghost-cli');
+			$meta = json_decode($json, true);
+			if (!is_array($meta)) {
+				return error("Failed decoding meta in `%s': %s", $approot, json_last_error_msg());
+			}
+
+			if ($targetVersion) {
+				$stat = $this->file_stat($approot . '/versions/' . $targetVersion);
+				if ($stat && $stat['referent']) {
+					$this->file_delete($approot . '/versions/' . $targetVersion);
+				}
+			}
+
+			if (($myver = array_get($meta, 'active-version')) === $version) {
+				return true;
+			}
+
+			info("Version in %(approot)s reported as %(oldver)s - forcing version as %(newver)s",
+				['approot' => $approot, 'oldver' => $myver, 'newver' => $version]);
+			$meta['active-version'] = $version;
+
+			return $this->file_put_file_contents($approot . '/.ghost-cli', json_encode($meta), true) > 0;
 		}
 
 		/**

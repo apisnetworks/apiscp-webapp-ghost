@@ -17,6 +17,9 @@ ApisCP will restart during which time its internal caches will be updated with t
 
 **Happy coding!**
 
+## Remote documentation
+See [docs.apisnetworks.com](https://docs.apiscp.com/admin/webapps/Ghost/)
+
 ## License
 All code within this repository has been relicensed under MIT by Apis Networks, INC.
 
