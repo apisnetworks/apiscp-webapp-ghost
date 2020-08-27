@@ -111,9 +111,9 @@
 					['what' => 'MySQL', 'app' => static::APP_NAME]);
 			}
 			$available = null;
-			if (!$this->hasMemoryAllowance(1024, $available)) {
+			if (!$this->hasMemoryAllowance(768, $available)) {
 				return error("%(app)s requires at least %(min)d MB memory, `%(found)d' MB provided for account",
-					['app' => 'Ghost', 'min' => 1024, 'found' => $available]);
+					['app' => 'Ghost', 'min' => 768, 'found' => $available]);
 			}
 			if (!$this->hasStorageAllowance(500, $available)) {
 				return error("%(app)s requires at least %(min)d MB storage. Only %(found).2f' MB provided for account",
