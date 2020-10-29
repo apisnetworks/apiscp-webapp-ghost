@@ -24,6 +24,8 @@
 	 */
 	class Ghost_Module extends Webapps
 	{
+		// via https://ghost.org/faq/node-versions/
+		const DEFAULT_NODE = '12';
 		use PublicRelocatable {
 			getAppRoot as getAppRootReal;
 		}
@@ -142,7 +144,7 @@
 				return false;
 			}
 
-			$this->validateNode('lts', $opts['user'] ?? null);
+			$this->validateNode(self::DEFAULT_NODE, $opts['user'] ?? null);
 
 			$args['version'] = $opts['version'];
 
@@ -282,7 +284,7 @@
 		 * @param string|null $user
 		 * @return bool
 		 */
-		protected function validateNode(string $version = 'lts', string $user = null): bool
+		protected function validateNode(string $version = self::DEFAULT_NODE, string $user = null): bool
 		{
 			if ($user) {
 				$afi = \apnscpFunctionInterceptor::factory(Auth::context($user, $this->site));
