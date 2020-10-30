@@ -145,6 +145,7 @@
 			}
 
 			$this->validateNode(self::DEFAULT_NODE, $opts['user'] ?? null);
+			$this->node_make_default(self::DEFAULT_NODE, $docroot);
 
 			$args['version'] = $opts['version'];
 
@@ -172,7 +173,7 @@
 			// ghost looks for "mysqld" if dbhost is localhost or 127.0.0.1;
 			// this isn't present in a synthetic root
 			$ret = $this->_exec($docroot,
-				'nvm exec --silent --lts ghost install %(debug)s --process=local --no-prompt --no-stack --no-start --no-color --db=mysql --dbhost=localhost.localdomain --dbuser=%(dbuser)s --dbpass=%(dbpassword)s ' .
+				'nvm exec --silent ghost install %(debug)s --process=local --no-prompt --no-stack --no-start --no-color --db=mysql --dbhost=localhost.localdomain --dbuser=%(dbuser)s --dbpass=%(dbpassword)s ' .
 				'--dbname=%(dbname)s --no-setup-linux-user --no-setup-nginx --url=%(proto)s%(uri)s --mail=sendmail %(version)s',
 				$args);
 
@@ -293,7 +294,7 @@
 			if (!$wrapper->node_installed($version) && !$wrapper->node_install($version)) {
 				return error('failed to install Node %s', $version);
 			}
-			$wrapper->node_do($version, 'nvm use --delete-prefix --lts');
+			$wrapper->node_do($version, 'nvm use --delete-prefix');
 			$ret = $wrapper->node_do($version, 'npm install -g ghost-cli');
 			if (!$ret['success']) {
 				return error('failed to install ghost-cli: %s', $ret['stderr'] ?? 'UNKNOWN ERROR');
