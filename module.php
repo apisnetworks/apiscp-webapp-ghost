@@ -189,7 +189,7 @@
 			$wrapper = empty($opts['user']) ? $this : \apnscpFunctionInterceptor::factory(Auth::context($opts['user'],
 				$this->site));
 			$nodever = $wrapper->node_lts_version();
-			$wrapper->node_make_default($nodever, $docroot);
+			$wrapper->node_make_default($nodever ?: self::DEFAULT_NODE, $docroot);
 
 			if (!isset($opts['password'])) {
 				$opts['password'] = \Opcenter\Auth\Password::generate(10);
