@@ -308,7 +308,7 @@
 			return true;
 		}
 
-		private function _exec($path = null, $cmd, array $args = array(), $env = array())
+		private function _exec(?string $path, $cmd, array $args = array(), $env = array())
 		{
 			// client may override tz, propagate to bin
 			if (!is_array($args)) {
