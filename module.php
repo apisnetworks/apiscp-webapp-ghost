@@ -188,8 +188,8 @@
 
 			$wrapper = empty($opts['user']) ? $this : \apnscpFunctionInterceptor::factory(Auth::context($opts['user'],
 				$this->site));
-			$nodever = $wrapper->node_lts_version();
-			$wrapper->node_make_default($nodever ?: self::DEFAULT_NODE, $docroot);
+			$nodever = $wrapper->node_lts_version() ?: self::DEFAULT_NODE;
+			$wrapper->node_make_default($nodever, $docroot);
 
 			if (!isset($opts['password'])) {
 				$opts['password'] = \Opcenter\Auth\Password::generate(10);
@@ -251,7 +251,7 @@
 				'PassengerAppEnv production' . "\n" .
 				'PassengerStartupFile current/index.js' . "\n" .
 				'PassengerAppType node' . "\n" .
-				'PassengerNodejs ' . $this->getNodeCommand('lts', $opts['user'] ?? null) . "\n" .
+				'PassengerNodejs ' . $this->getNodeCommand($nodever, $opts['user'] ?? null) . "\n" .
 				'PassengerAppRoot ' . $approot . "\n"
 			)) {
 				return error('failed to create .htaccess control - Ghost is not properly setup');
