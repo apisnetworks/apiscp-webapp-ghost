@@ -218,6 +218,7 @@
 				'useMinFiles'              => 'true',
 				'caching.frontend.maxAge'  => 120,
 				'logging.rotation.enabled' => 'true',
+				'mail.transport'           => 'sendmail',
 				// frontend caches + leave 5 for update/admin
 				'database.pool.max'        => 5,
 				'paths.contentPath'        => "${approot}/content"
