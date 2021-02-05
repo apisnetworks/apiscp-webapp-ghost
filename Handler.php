@@ -28,4 +28,13 @@
 		{
 			return $this->ghost_change_admin($this->hostname, $this->path, ['password' => $password]);
 		}
+
+		public function getInstallableVersions(): array
+		{
+			return array_filter(parent::getInstallableVersions(), static function ($version) {
+				return false === strpos($version, '-');
+			});
+		}
+
+
 	}

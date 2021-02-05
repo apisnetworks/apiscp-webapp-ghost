@@ -143,7 +143,6 @@
 			if (!$this->parseInstallOptions($opts, $hostname, $path)) {
 				return false;
 			}
-
 			$this->validateNode(self::DEFAULT_NODE, $opts['user'] ?? null);
 			$this->node_make_default(self::DEFAULT_NODE, $docroot);
 
@@ -183,7 +182,7 @@
 				$db->rollback();
 
 				return error('failed to download Ghost v%s: %s - possibly out of storage space?', $args['version'],
-					$ret['stderr']);
+					$ret['stdout']);
 			}
 
 			$wrapper = empty($opts['user']) ? $this : \apnscpFunctionInterceptor::factory(Auth::context($opts['user'],
