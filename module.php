@@ -745,8 +745,8 @@
 					return error('Failed to prep for major version upgrade');
 				}
 
-				return error('Ghost must be upgraded from terminal. Run the following command to use the migration assistant: ' .
-					'cd %s && env NODE_ENV=production nvm exec ghost update --local -f', $approot);
+				return error('Ghost upgrade must be manually completed. Run the following command to use the migration assistant: ' .
+					'cd %s && NODE_ENV=production nvm exec ghost update --local -f', $approot);
 			}
 			// force version assertion on incomplete upgrade
 			$this->assertLocalVersion($approot, $oldversion, $version);
