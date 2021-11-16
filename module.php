@@ -381,7 +381,7 @@
 				$this->fixSymlink($this->file_unmake_path($approot));
 			}
 
-			return file_exists($approot . '/current/core/server/lib/ghost-version.js');
+			return file_exists($approot . '/current/core/server/ghost-server.js');
 		}
 
 		/**
