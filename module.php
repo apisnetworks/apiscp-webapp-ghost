@@ -36,7 +36,9 @@
 		const NODE_VERSIONS = [
 			'0'     => self::DEFAULT_NODE,
 			'4.0'   => '12.10.0',
-			'4.5'   => '12.22.1'
+			'4.5'   => '12.22.1',
+			'4.6'   => '14.16.1',
+			'4.21'  => '14.17.0'
 		];
 
 		public function plugin_status(string $hostname, string $path = '', string $plugin = null)
