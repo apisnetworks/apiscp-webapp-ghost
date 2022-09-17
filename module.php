@@ -501,6 +501,7 @@
 		private function migrate(string $approot, string $appenv = 'production'): bool
 		{
 			$this->linkConfiguration($approot, $appenv);
+			$this->_exec($approot, 'which knex-migrator > /dev/null || npm install -g knex-migrator');
 			$ret = $this->_exec("${approot}/current", 'nvm exec knex-migrator migrate', [], ['NODE_VERSION' => $this->node_get_default($approot)]);
 
 			return $ret['success'] ?: error("failed to migrate database in `%s': %s", $approot,
