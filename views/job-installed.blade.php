@@ -11,8 +11,8 @@
 ## Admin panel
 You can access the panel at [{{$proto}}{{$uri}}{{\Module\Support\Webapps\App\Type\Ghost\Handler::ADMIN_PATH}}]({{$proto}}{{$uri}}{{\Module\Support\Webapps\App\Type\Ghost\Handler::ADMIN_PATH}}) using the following information:
 
-**Login**: `{{ str_replace('@', '\\@', $email) }}`<br/>
-**Password**: `{{ str_replace('@', '\\@', $password) }}`
+**Login**: `{{ $email }}`<br/>
+**Password**: `{{ $password }}`
 
 ---
 
