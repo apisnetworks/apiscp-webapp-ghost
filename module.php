@@ -124,6 +124,11 @@
 			if (!$this->parseInstallOptions($opts, $hostname, $path)) {
 				return false;
 			}
+
+			if (!$this->platformVersionCheck((string)$opts['version'])) {
+				return error("Ghost %s cannot be installed on this platform", $opts['version']);
+			}
+
 			$nodeVersion = $this->validateNode((string)$opts['version'], $opts['user'] ?? null);
 			$this->node_make_default($nodeVersion, $docroot);
 
@@ -690,6 +695,9 @@
 				return error('invalid version number, %s', $version);
 			}
 
+			if (!$this->platformVersionCheck($version)) {
+				return error("Ghost %s cannot be installed on this platform", $version);
+			}
 
 			$this->file_chmod($approot, 705);
 
@@ -806,6 +814,24 @@
 			$versions = $this->_getVersions();
 
 			return array_column($versions, 'version');
+		}
+
+		public function get_installable_versions(): array
+		{
+
+			return array_filter($this->get_versions(), [$this, 'platformVersionCheck']);
+		}
+
+		/**
+		 * Ghost version supported by platform
+		 *
+		 * @param string $version
+		 * @return bool
+		 */
+		private function platformVersionCheck(string $version): bool
+		{
+			// Ghost v5+ requires MySQL v8
+			return version_compare($version, '5.0', '<');
 		}
 
 		/**

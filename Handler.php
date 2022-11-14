@@ -31,7 +31,7 @@
 
 		public function getInstallableVersions(): array
 		{
-			return array_filter(parent::getInstallableVersions(), static function ($version) {
+			return array_filter($this->ghost_get_installable_versions(), static function ($version) {
 				return false === strpos($version, '-');
 			});
 		}
