@@ -38,7 +38,8 @@
 			'4.0'   => '12.10.0',
 			'4.5'   => '12.22.1',
 			'4.6'   => '14.16.1',
-			'4.21'  => '14.17.0'
+			'4.21'  => '14.18.0',
+			'5.0'   => '16.19',
 		];
 
 		public function plugin_status(string $hostname, string $path = '', string $plugin = null)
@@ -243,7 +244,7 @@
 				return error('failed to create .htaccess control - Ghost is not properly setup');
 			}
 
-			$this->_exec($approot, 'npm install -g knex-migrator');
+			$this->node_do($nodeVersion, 'npm install -g knex-migrator');
 			$ret = $this->_exec("${approot}/current", 'nvm exec knex-migrator init', ['NODE_VERSION' => $nodeVersion]);
 			if (!$ret['success']) {
 				return error('Failed to create initial database configuration - knex-migrator failed: %s',
@@ -831,7 +832,7 @@
 		private function platformVersionCheck(string $version): bool
 		{
 			// Ghost v5+ requires MySQL v8
-			return version_compare($version, '5.0', '<');
+			return version_compare($version, '5.21', '<') || version_compare($version, '5.24.0', '>=');
 		}
 
 		/**
