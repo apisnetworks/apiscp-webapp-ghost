@@ -847,7 +847,10 @@
 			if (false !== ($ver = $cache->get($key))) {
 				return (array)$ver;
 			}
-			$versions = (new Webapps\VersionFetcher\Github)->fetch('TryGhost/Ghost');
+			$versions = array_filter((new Webapps\VersionFetcher\Github)->fetch('TryGhost/Ghost'), static function($item) {
+				return $item['version'] !== '5.4.0';
+			});
+
 			$cache->set($key, $versions, 43200);
 
 			return $versions;
