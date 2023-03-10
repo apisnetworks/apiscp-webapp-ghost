@@ -58,7 +58,7 @@
 		}
 
 
-		public function restart(string $hostname, string $path): bool
+		public function restart(string $hostname, string $path = ''): bool
 		{
 			if (!$approot = $this->getAppRoot($hostname, $path)) {
 				return false;
@@ -848,7 +848,7 @@
 				return (array)$ver;
 			}
 			$versions = array_filter((new Webapps\VersionFetcher\Github)->fetch('TryGhost/Ghost'), static function($item) {
-				return $item['version'] !== '5.4.0';
+				return version_compare($item['version'], '5.0.0', '<') || version_compare($item['version'], '5.24.1', '>=');
 			});
 
 			$cache->set($key, $versions, 43200);
