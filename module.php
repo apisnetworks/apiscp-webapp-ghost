@@ -848,6 +848,9 @@
 				return (array)$ver;
 			}
 			$versions = array_filter((new Webapps\VersionFetcher\Github)->fetch('TryGhost/Ghost'), static function($item) {
+				if ($item['version'] === '5.45.0') {
+					return false;
+				}
 				return version_compare($item['version'], '5.0.0', '<') || version_compare($item['version'], '5.24.1', '>=');
 			});
 
