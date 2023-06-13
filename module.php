@@ -389,7 +389,7 @@
 				$this->fixSymlink($this->file_unmake_path($approot));
 			}
 
-			return file_exists($approot . '/current/core/server/ghost-server.js');
+			return file_exists($approot . '/current/core/server/ghost-server.js') || file_exists($approot . '/current/core/server/GhostServer.js');
 		}
 
 		/**
