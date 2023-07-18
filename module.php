@@ -389,7 +389,19 @@
 				$this->fixSymlink($this->file_unmake_path($approot));
 			}
 
-			return file_exists($approot . '/current/core/server/ghost-server.js') || file_exists($approot . '/current/core/server/GhostServer.js');
+			$tests = [
+				'core/server/ghost-server.js',
+				'core/server/GhostServer.js',
+				'core/core/server/GhostServer.js'
+			];
+
+			foreach ($tests as $test) {
+				if (file_exists("{$approot}/current/{$test}")) {
+					return true;
+				}
+			}
+
+			return false;
 		}
 
 		/**
