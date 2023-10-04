@@ -733,7 +733,7 @@
 					//is_debug() ? '-V' : null;
 				}
 				// @TODO update LTS?
-				if (!$this->_exec($approot, 'nvm exec ghost update %s --local -D --no-restart --no-color --v%d',
+				if (!$this->_exec($approot, 'nvm exec ghost update %s --local --no-restart --no-color --v%d',
 					[
 						null,
 						\Opcenter\Versioning::asMajor($oldversion)
@@ -748,7 +748,7 @@
 			$this->assertLocalVersion($approot, $oldversion, $version);
 			// more bad permission requirements, -D bypasses chmod requirement
 
-			$cmd = 'nvm exec ghost update %(debug)s --no-restart -D --local --no-prompt --no-color %(version)s';
+			$cmd = 'nvm exec ghost update %(debug)s --no-restart --local --no-prompt --no-color %(version)s';
 			// disable debug mode for now, causes stdout maxBuffer exceeded error
 			if (is_debug()) {
 				warn("Disabling debug mode as it causes a maxBuffer exceeded error");
@@ -932,5 +932,3 @@
 			return error('not implemented');
 		}
 	}
-
-
