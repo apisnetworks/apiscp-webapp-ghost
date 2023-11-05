@@ -33,6 +33,7 @@
 		const GHOST_CLI = 'ghost';
 		const DEFAULT_VERSION_LOCK = 'major';
 
+		// via ghost/core/package.json
 		const NODE_VERSIONS = [
 			'0'     => self::DEFAULT_NODE,
 			'4.0'   => '12.10.0',
@@ -40,6 +41,7 @@
 			'4.6'   => '14.16.1',
 			'4.21'  => '14.18.0',
 			'5.0'   => '16.19',
+			'5.30'  => '18.12',
 		];
 
 		public function plugin_status(string $hostname, string $path = '', string $plugin = null)
@@ -131,7 +133,10 @@
 			}
 
 			$nodeVersion = $this->validateNode((string)$opts['version'], $opts['user'] ?? null);
-			$this->node_make_default($nodeVersion, $docroot);
+
+			$wrapper = empty($opts['user']) ? $this : \apnscpFunctionInterceptor::factory(Auth::context($opts['user'],
+				$this->site));
+			$wrapper->node_make_default($nodeVersion, $docroot);
 
 			$args['version'] = $opts['version'];
 
@@ -171,9 +176,6 @@
 				return error('failed to download Ghost v%s: %s - possibly out of storage space?', $args['version'],
 					$ret['stdout']);
 			}
-
-			$wrapper = empty($opts['user']) ? $this : \apnscpFunctionInterceptor::factory(Auth::context($opts['user'],
-				$this->site));
 
 			$wrapper->node_make_default($nodeVersion, $docroot);
 
@@ -244,7 +246,7 @@
 				return error('failed to create .htaccess control - Ghost is not properly setup');
 			}
 
-			$this->node_do($nodeVersion, 'npm install -g knex-migrator');
+			$wrapper->node_do($nodeVersion, 'npm install -g knex-migrator');
 			$ret = $this->_exec("${approot}/current", 'nvm exec knex-migrator init', ['NODE_VERSION' => $nodeVersion]);
 			if (!$ret['success']) {
 				return error('Failed to create initial database configuration - knex-migrator failed: %s',
@@ -311,6 +313,8 @@
 				$cmd = 'cd %(path)s && /bin/bash -ic -- ' . escapeshellarg($cmd);
 				$args['path'] = $path;
 				$user = $this->file_stat($path)['owner'] ?? $this->username;
+			} else {
+				$env += ['SHELL' => '/bin/bash'];
 			}
 
 			$ret = $this->pman_run($cmd, $args,
