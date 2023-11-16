@@ -500,13 +500,7 @@
 		 */
 		private function linkConfiguration(string $approot, string $appenv = 'production'): bool
 		{
-			$stat = $this->file_stat($approot . "/current/config.${appenv}.json");
-			if ($stat) {
-				if ($stat['link']) {
-					return true;
-				}
-				$this->file_delete($approot . "/current/config.${appenv}.json");
-			}
+			$this->file_delete($approot . "/current/config.${appenv}.json");
 
 			return $this->file_symlink($approot . "/config.${appenv}.json",
 					$approot . "/current/config.${appenv}.json") ||
