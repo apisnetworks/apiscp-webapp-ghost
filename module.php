@@ -12,10 +12,10 @@
 	 *  +------------------------------------------------------------+
 	 */
 
-	use Module\Support\Webapps;
-	use Module\Support\Webapps\Traits\PublicRelocatable;
+use Module\Support\Webapps;
+use Module\Support\Webapps\Traits\PublicRelocatable;
 
-	/**
+/**
 	 * Ghost management
 	 *
 	 * A blogging platform built on Node
@@ -246,7 +246,7 @@
 				return error('failed to create .htaccess control - Ghost is not properly setup');
 			}
 
-			$wrapper->node_do($nodeVersion, 'npm install -g knex-migrator');
+			$wrapper->node_do($nodeVersion, null, 'npm install -g knex-migrator');
 			$ret = $this->_exec("${approot}/current", 'nvm exec knex-migrator init', ['NODE_VERSION' => $nodeVersion]);
 			if (!$ret['success']) {
 				return error('Failed to create initial database configuration - knex-migrator failed: %s',
@@ -285,8 +285,8 @@
 				error('failed to install Node %s', $nodeVersion);
 				return null;
 			}
-			$wrapper->node_do($nodeVersion, 'nvm use --delete-prefix');
-			$ret = $wrapper->node_do($nodeVersion, 'npm install -g ghost-cli');
+			$wrapper->node_do($nodeVersion, null, 'nvm use --delete-prefix');
+			$ret = $wrapper->node_do($nodeVersion, null, 'npm install -g ghost-cli');
 			if (!$ret['success']) {
 				error('failed to install ghost-cli: %s', $ret['stderr'] ?? 'UNKNOWN ERROR');
 				return null;
@@ -486,7 +486,7 @@
 			if ($user) {
 				$afi = \apnscpFunctionInterceptor::factory(Auth::context($user, $this->site));
 			}
-			$ret = ($afi ?? $this)->node_do($version, 'which node');
+			$ret = ($afi ?? $this)->node_do($version, null, 'which node');
 
 			return $ret['success'] ? trim($ret['output']) : null;
 		}
