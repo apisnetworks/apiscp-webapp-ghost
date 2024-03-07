@@ -12,10 +12,10 @@
 	 *  +------------------------------------------------------------+
 	 */
 
-use Module\Support\Webapps;
-use Module\Support\Webapps\Traits\PublicRelocatable;
+	use Module\Support\Webapps;
+	use Module\Support\Webapps\Traits\PublicRelocatable;
 
-/**
+	/**
 	 * Ghost management
 	 *
 	 * A blogging platform built on Node
@@ -120,13 +120,11 @@ use Module\Support\Webapps\Traits\PublicRelocatable;
 				return error('Ghost may only be installed directly on a subdomain or domain without a child path, e.g. https://domain.com but not https://domain.com/ghost');
 			}
 
-			if (!($docroot = $this->getDocumentRoot($hostname, $path))) {
-				return error("failed to normalize path for `%s'", $hostname);
-			}
-
 			if (!$this->parseInstallOptions($opts, $hostname, $path)) {
 				return false;
 			}
+
+			$docroot = $this->getDocumentRoot($hostname, $path);
 
 			if (!$this->platformVersionCheck((string)$opts['version'])) {
 				return error("Ghost %s cannot be installed on this platform", $opts['version']);
