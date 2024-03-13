@@ -516,8 +516,8 @@
 		{
 			$this->linkConfiguration($approot, $appenv);
 			$this->_exec("$approot/current", 'nvm exec which knex-migrator > /dev/null || nvm exec npm install -g knex-migrator', [],
-				['NODE_VERSION' => $this->node_get_default($approot)]);
-			$ret = $this->_exec("${approot}/current", 'nvm exec knex-migrator migrate', [], ['NODE_VERSION' => $this->node_get_default($approot)]);
+				['NODE_VERSION' => $this->node_version_from_path($approot)]);
+			$ret = $this->_exec("${approot}/current", 'nvm exec knex-migrator migrate', [], ['NODE_VERSION' => $this->node_version_from_path($approot)]);
 
 			return $ret['success'] ?: error("failed to migrate database in `%s': %s", $approot,
 				coalesce($ret['stderr'], $ret['stdout']));
@@ -728,8 +728,8 @@
 					warn("Disabling debug mode as it causes a maxBuffer exceeded error");
 					//is_debug() ? '-V' : null;
 				}
-				// @TODO update LTS?
-				if (!$this->_exec($approot, 'nvm exec ghost update %s --local --no-restart --no-color --v%d',
+				// newer ghost-cli are sudo-happy
+				if (!$this->_exec($approot, 'sudo() { return 0; }; export -f sudo ; nvm exec ghost update %s --local --no-restart --no-color --v%d',
 					[
 						null,
 						\Opcenter\Versioning::asMajor($oldversion)
