@@ -26,6 +26,7 @@
 	{
 		// via https://ghost.org/faq/node-versions/
 		const DEFAULT_NODE = '12';
+		const GHOST_CLI_REPO = 'git+https://github.com/msaladna/ghost-cli-lite.git';
 		use PublicRelocatable {
 			getAppRoot as getAppRootReal;
 		}
@@ -231,18 +232,19 @@
 
 			$this->linkConfiguration($approot, 'production');
 
-			if (!$this->file_put_file_contents($docroot . '/.htaccess',
+			if (!$wrapper->file_put_file_contents($docroot . '/.htaccess',
 				'# Enable caching' . "\n" .
 				'UnsetEnv no-cache' . "\n" .
 				'PassengerEnabled on' . "\n" .
 				'PassengerAppEnv production' . "\n" .
 				'PassengerStartupFile current/index.js' . "\n" .
 				'PassengerAppType node' . "\n" .
-				'PassengerNodejs ' . $this->getNodeCommand($nodeVersion, $opts['user'] ?? null) . "\n" .
 				'PassengerAppRoot ' . $approot . "\n"
 			)) {
 				return error('failed to create .htaccess control - Ghost is not properly setup');
 			}
+
+			$this->setInterpreter($docroot, $nodeVersion);
 
 			$wrapper->node_do($nodeVersion, null, 'npm install -g knex-migrator');
 			$ret = $this->_exec("${approot}/current", 'nvm exec knex-migrator init', ['NODE_VERSION' => $nodeVersion]);
@@ -265,12 +267,24 @@
 				['app' => static::APP_NAME, 'email' => $opts['email']]);
 		}
 
+		private function setInterpreter(string $docroot, string $nodeVersion): bool
+		{
+			$htaccess = $this->file_get_file_contents("{$docroot}/.htaccess");
+			$new = preg_replace(
+				'/\R(?:^PassengerNodejs .*$|$)/m',
+				"\n". 'PassengerNodejs ' . $this->getNodeCommand($nodeVersion, $this->file_stat($docroot)['owner']),
+				$htaccess,
+				1
+			);
+			return $this->file_put_file_contents("{$docroot}/.htaccess", $new);
+		}
+
 		/**
 		 * Verify Node LTS is installed
 		 *
 		 * @param string|null $version optional version to compare against
 		 * @param string|null $user
-		 * @return bool
+		 * @return null|string
 		 */
 		protected function validateNode(string $version = self::DEFAULT_NODE, string $user = null): ?string
 		{
@@ -279,12 +293,14 @@
 			}
 			$wrapper = $afi ?? $this;
 			$nodeVersion = \Opcenter\Versioning::satisfy($version, self::NODE_VERSIONS);
+
 			if (!$wrapper->node_installed($nodeVersion) && !$wrapper->node_install($nodeVersion)) {
 				error('failed to install Node %s', $nodeVersion);
 				return null;
 			}
+
 			$wrapper->node_do($nodeVersion, null, 'nvm use --delete-prefix');
-			$ret = $wrapper->node_do($nodeVersion, null, 'npm install -g ghost-cli');
+			$ret = $wrapper->node_do($nodeVersion, null, 'npm install -g ' . self::GHOST_CLI_REPO);
 			if (!$ret['success']) {
 				error('failed to install ghost-cli: %s', $ret['stderr'] ?? 'UNKNOWN ERROR');
 				return null;
@@ -520,7 +536,7 @@
 			$ret = $this->_exec("${approot}/current", 'nvm exec knex-migrator migrate', [], ['NODE_VERSION' => $this->node_version_from_path($approot)]);
 
 			return $ret['success'] ?: error("failed to migrate database in `%s': %s", $approot,
-				coalesce($ret['stderr'], $ret['stdout']));
+				coalesce($ret['stdout'], $ret['stderr']));
 		}
 
 		/**
@@ -697,6 +713,7 @@
 				return error('update failed');
 			}
 
+			$docroot = $this->getDocumentRoot($hostname, $path);
 			if (!$version) {
 				$version = \Opcenter\Versioning::nextVersion($this->get_versions(),
 					$this->get_version($hostname, $path));
@@ -714,22 +731,21 @@
 			if ($oldversion === $version) {
 				return info("Ghost is already at current version `%s'", $version);
 			}
+			$oldNodeVersion = $this->node_version_from_path($approot);
+
+			if ($oldNodeVersion !== ($nodeVersion = $this->validateNode($version, $this->getDocrootUser($approot)))) {
+				info("Updating Node %(old)s => %(new)s per dependency requirements of Ghost %(ghostver)s", [
+					'old' => $oldNodeVersion,
+					'new' => $nodeVersion,
+					'ghostver' => $version
+				]);
+				// @TODO bounce Apache?
+				defer($_, fn() => $this->setInterpreter($this->getDocumentRoot($hostname, $path), $nodeVersion));
+			}
 
 			if (\Opcenter\Versioning::asMajor($version) !== \Opcenter\Versioning::asMajor($oldversion)) {
-				info('Major upgrade detected - updating ghost-cli, relaxing permissions');
-				// Permission requirements are insanely insecure... otherwise Ghost vomits.
-				$this->pman_run(
-					'find %(approot)s/ -mindepth 1 -type d -exec chmod 00775 {} \;',
-					['approot' => $approot],
-					[],
-					['user' => $this->getDocrootUser($approot)]
-				);
-				if (is_debug()) {
-					warn("Disabling debug mode as it causes a maxBuffer exceeded error");
-					//is_debug() ? '-V' : null;
-				}
 				// newer ghost-cli are sudo-happy
-				if (!$this->_exec($approot, 'sudo() { return 0; }; export -f sudo ; nvm exec ghost update %s --local --no-restart --no-color --v%d',
+				if (!$this->_exec($approot, 'nvm exec ghost update %s --local --no-restart --no-color --v%d',
 					[
 						null,
 						\Opcenter\Versioning::asMajor($oldversion)
@@ -748,14 +764,13 @@
 			// disable debug mode for now, causes stdout maxBuffer exceeded error
 			if (is_debug()) {
 				warn("Disabling debug mode as it causes a maxBuffer exceeded error");
-				//is_debug() ? '-V' : null;
 			}
+
 			$args['debug'] = null;
 			$args['version'] = $version;
 			$ret = $this->_exec($approot, $cmd, $args);
 			$this->fixSymlink($approot);
 			$this->file_touch("${approot}/tmp/restart.txt");
-
 			if (!$ret['success']) {
 				$this->setInfo($this->getDocumentRoot($hostname, $path), [
 					'version' => $this->get_version($hostname, $path),
@@ -768,11 +783,11 @@
 			}
 
 			$ret = $this->migrate($approot) && ($this->kill($hostname, $path) || true);
-
+			$this->setInterpreter($docroot, $nodeVersion);
 			if ($version !== ($newver = $this->get_version($hostname, $path))) {
 				report("Upgrade failed, reported version `%s' is not requested version `%s'", $newver, $version);
 			}
-			$this->setInfo($this->getDocumentRoot($hostname, $path), [
+			$this->setInfo($docroot, [
 				'version' => $newver,
 				'failed'  => !$ret
 			]);
