@@ -250,7 +250,7 @@
 			$ret = $this->_exec("${approot}/current", 'nvm exec knex-migrator init', ['NODE_VERSION' => $nodeVersion]);
 			if (!$ret['success']) {
 				return error('Failed to create initial database configuration - knex-migrator failed: %s',
-					coalesce($ret['stderr'], $ret['stdout']));
+					$ret['stdout']);
 			}
 			if (!$this->migrate($approot)) {
 				return error('Failed to migrate database configuration - Ghost installation incomplete');
@@ -836,7 +836,6 @@
 		public function get_versions(): array
 		{
 			$versions = $this->_getVersions();
-
 			return array_column($versions, 'version');
 		}
 
@@ -872,6 +871,9 @@
 			}
 			$versions = array_filter((new Webapps\VersionFetcher\Github)->fetch('TryGhost/Ghost'), static function($item) {
 				if ($item['version'] === '5.45.0') {
+					return false;
+				}
+				if ($item['version'] === '5.31.0') {
 					return false;
 				}
 				return version_compare($item['version'], '5.0.0', '<') || version_compare($item['version'], '5.24.1', '>=');
