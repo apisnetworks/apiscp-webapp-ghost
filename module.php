@@ -147,6 +147,8 @@
 				return false;
 			}
 
+			$args['dbhost'] = $db->hostname;
+			$args['dbkind'] = $db->kind;
 			$args['dbname'] = $db->database;
 			$args['dbuser'] = $db->username;
 			$args['dbpassword'] = $db->password;
@@ -163,7 +165,7 @@
 			// ghost looks for "mysqld" if dbhost is localhost or 127.0.0.1;
 			// this isn't present in a synthetic root
 			$ret = $this->_exec($docroot,
-				'nvm exec --silent ghost install %(debug)s --process=local --no-prompt --no-stack --no-start --no-color --db=mysql --dbhost=localhost.localdomain --dbuser=%(dbuser)s --dbpass=%(dbpassword)s ' .
+				'ghost install %(debug)s --process=local --no-prompt --no-stack --no-start --no-color --db=%(dbkind)s --dbhost=%(dbhost)s --dbuser=%(dbuser)s --dbpass=%(dbpassword)s ' .
 				'--dbname=%(dbname)s --no-setup-linux-user --no-setup-nginx --url=%(proto)s%(uri)s --mail=sendmail %(version)s',
 				$args);
 
@@ -212,7 +214,7 @@
 			];
 
 			foreach ($config as $c => $v) {
-				$ret = $this->_exec($approot, 'nvm exec ghost config set %(c)s %(v)s', ['c' => $c, 'v' => $v]);
+				$ret = $this->_exec($approot, 'ghost config set %(c)s %(v)s', ['c' => $c, 'v' => $v]);
 				if (!$ret['success']) {
 					info('removing temporary files');
 					$this->file_delete($docroot, true);
@@ -246,8 +248,8 @@
 
 			$this->setInterpreter($docroot, $nodeVersion);
 
-			$wrapper->node_do($nodeVersion, null, 'npm install -g knex-migrator');
-			$ret = $this->_exec("${approot}/current", 'nvm exec knex-migrator init', ['NODE_VERSION' => $nodeVersion]);
+			$wrapper->node_do($nodeVersion, null, 'npm install -g --production knex-migrator');
+			$ret = $wrapper->node_do($nodeVersion, "${approot}/current", 'knex-migrator init', [], ['NODE_ENV' => 'production']);
 			if (!$ret['success']) {
 				return error('Failed to create initial database configuration - knex-migrator failed: %s',
 					$ret['stdout']);
@@ -322,28 +324,22 @@
 				$args = func_get_args();
 				array_shift($args);
 			}
-			$user = $this->username;
-			if ($path) {
-				$cmd = 'cd %(path)s && /bin/bash -ic -- ' . escapeshellarg($cmd);
-				$args['path'] = $path;
-				$user = $this->file_stat($path)['owner'] ?? $this->username;
-			} else {
-				$env += ['SHELL' => '/bin/bash'];
-			}
 
-			$ret = $this->pman_run($cmd, $args,
+			$wrapper = $this->getApnscpFunctionInterceptorFromDocroot($path ?? '~');
+			$ret = $wrapper->node_do(
+				null,
+				$path,
+				$cmd,
+				$args,
 				$env + [
-					'NVM_DIR'  => $this->user_get_home($user),
-					'PATH'     => getenv('PATH') . PATH_SEPARATOR . '~/node_modules/.bin',
 					'NODE_ENV' => 'production'
-				], ['user' => $user]);
+				]);
 			if (!strncmp(coalesce($ret['stderr'], $ret['stdout']), 'Error:', strlen('Error:'))) {
 				// move stdout to stderr on error for consistency
 				$ret['success'] = false;
 				if (!$ret['stderr']) {
 					$ret['stderr'] = $ret['stdout'];
 				}
-
 			}
 
 			return $ret;
@@ -531,9 +527,8 @@
 		private function migrate(string $approot, string $appenv = 'production'): bool
 		{
 			$this->linkConfiguration($approot, $appenv);
-			$this->_exec("$approot/current", 'nvm exec which knex-migrator > /dev/null || nvm exec npm install -g knex-migrator', [],
-				['NODE_VERSION' => $this->node_version_from_path($approot)]);
-			$ret = $this->_exec("${approot}/current", 'nvm exec knex-migrator migrate', [], ['NODE_VERSION' => $this->node_version_from_path($approot)]);
+			$this->_exec("$approot/current", 'which knex-migrator > /dev/null || npm install --no-dev -g knex-migrator');
+			$ret = $this->_exec("${approot}/current", 'knex-migrator migrate');
 
 			return $ret['success'] ?: error("failed to migrate database in `%s': %s", $approot,
 				coalesce($ret['stdout'], $ret['stderr']));
@@ -745,7 +740,7 @@
 
 			if (\Opcenter\Versioning::asMajor($version) !== \Opcenter\Versioning::asMajor($oldversion)) {
 				// newer ghost-cli are sudo-happy
-				if (!$this->_exec($approot, 'nvm exec ghost update %s --local --no-restart --no-color --v%d',
+				if (!$this->_exec($approot, 'ghost update %s --local --no-restart --no-color --v%d',
 					[
 						null,
 						\Opcenter\Versioning::asMajor($oldversion)
@@ -760,7 +755,7 @@
 			$this->assertLocalVersion($approot, $oldversion, $version);
 			// more bad permission requirements, -D bypasses chmod requirement
 
-			$cmd = 'nvm exec ghost update %(debug)s --no-restart --local --no-prompt --no-color %(version)s';
+			$cmd = 'ghost update %(debug)s --no-restart --local --no-prompt --no-color %(version)s';
 			// disable debug mode for now, causes stdout maxBuffer exceeded error
 			if (is_debug()) {
 				warn("Disabling debug mode as it causes a maxBuffer exceeded error");
