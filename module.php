@@ -781,9 +781,15 @@
 			$this->setInterpreter($docroot, $nodeVersion);
 			if ($version !== ($newver = $this->get_version($hostname, $path))) {
 				report("Upgrade failed, reported version `%s' is not requested version `%s'", $newver, $version);
+			} else if ($ret) {
+				// unlink previous version
+				$this->file_delete("{$approot}/versions/{$oldversion}", true);
+				// cleanup orphaned packages
+				$this->_exec($approot, 'npm prune');
 			}
+
 			$this->setInfo($docroot, [
-				'version' => $newver,
+				'version' => $version,
 				'failed'  => !$ret
 			]);
 
@@ -836,8 +842,7 @@
 
 		public function get_installable_versions(): array
 		{
-
-			return array_filter($this->get_versions(), [$this, 'platformVersionCheck']);
+			return array_filter($this->get_versions(), $this->platformVersionCheck(...));
 		}
 
 		/**
@@ -864,15 +869,13 @@
 			if (false !== ($ver = $cache->get($key))) {
 				return (array)$ver;
 			}
-			$versions = array_filter((new Webapps\VersionFetcher\Github)->fetch('TryGhost/Ghost'), static function($item) {
-				if ($item['version'] === '5.45.0') {
-					return false;
+			$versions = array_filter(
+				(new Webapps\VersionFetcher\PackageJson)->fetch('ghost', static function ($item) {
+					return !isset($item['deprecated']) && (
+						version_compare($item['version'], '5.0.0','<') || version_compare($item['version'], '5.24.1', '>=')
+					);
 				}
-				if ($item['version'] === '5.31.0') {
-					return false;
-				}
-				return version_compare($item['version'], '5.0.0', '<') || version_compare($item['version'], '5.24.1', '>=');
-			});
+			));
 
 			$cache->set($key, $versions, 43200);
 
