@@ -295,6 +295,13 @@
 			}
 			$wrapper = $afi ?? $this;
 			$nodeVersion = \Opcenter\Versioning::satisfy($version, self::NODE_VERSIONS);
+			foreach ([\Opcenter\Versioning::asMajor($nodeVersion), $nodeVersion] as $testVersion) {
+				if (($chk = $wrapper->node_installed($testVersion)) && version_compare($chk, $nodeVersion, '>='))
+				{
+					$nodeVersion = $chk;
+					break;
+				}
+			}
 
 			if (!$wrapper->node_installed($nodeVersion) && !$wrapper->node_install($nodeVersion)) {
 				error('failed to install Node %s', $nodeVersion);
