@@ -796,7 +796,7 @@
 			}
 
 			$this->setInfo($docroot, [
-				'version' => $version,
+				'version' => $newver,
 				'failed'  => !$ret
 			]);
 
@@ -878,9 +878,12 @@
 			}
 			$versions = array_filter(
 				(new Webapps\VersionFetcher\PackageJson)->fetch('ghost', static function ($item) {
-					return !isset($item['deprecated']) && (
-						version_compare($item['version'], '5.0.0','<') || version_compare($item['version'], '5.24.1', '>=')
-					);
+					if (isset($item['deprecated'])) {
+						return null;
+					}
+
+					return version_compare($item['version'], '5.0.0','<') || version_compare($item['version'], '5.24.1', '>=')
+						? $item : null;
 				}
 			));
 
