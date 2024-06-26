@@ -230,8 +230,6 @@
 			}
 
 
-			$this->initializeMeta($docroot, $opts);
-
 			$this->linkConfiguration($approot, 'production');
 
 			if (!$wrapper->file_put_file_contents($docroot . '/.htaccess',
