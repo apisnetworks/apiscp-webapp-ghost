@@ -784,7 +784,7 @@
 
 			$ret = $this->migrate($approot) && ($this->kill($hostname, $path) || true);
 			$this->setInterpreter($docroot, $nodeVersion);
-			if ($version !== ($newver = $this->get_version($hostname, $path))) {
+			if (!\Opcenter\Versioning::compare($version, $newver = $this->get_version($hostname, $path))) {
 				report("Upgrade failed, reported version `%s' is not requested version `%s'", $newver, $version);
 			} else if ($ret) {
 				// unlink previous version
