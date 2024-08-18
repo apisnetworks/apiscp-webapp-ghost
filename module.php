@@ -877,11 +877,10 @@
 			$versions = array_filter(
 				(new Webapps\VersionFetcher\PackageJson)->fetch('ghost', static function ($item) {
 					if (isset($item['deprecated'])) {
-						return null;
+						return false;
 					}
-
 					return version_compare($item['version'], '5.0.0','<') || version_compare($item['version'], '5.24.1', '>=')
-						? $item : null;
+						? $item : false;
 				}
 			));
 
