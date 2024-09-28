@@ -210,7 +210,7 @@
 				'mail.transport'           => 'sendmail',
 				// frontend caches + leave 5 for update/admin
 				'database.pool.max'        => 5,
-				'paths.contentPath'        => "${approot}/content"
+				'paths.contentPath'        => "{$approot}/content"
 			];
 
 			foreach ($config as $c => $v) {
@@ -224,8 +224,8 @@
 			}
 
 			foreach (['tmp', 'public', 'logs'] as $dir) {
-				($this->file_create_directory("${approot}/${dir}") &&
-					$this->file_chown("${approot}/${dir}", $opts['user'] ?? $this->username)
+				($this->file_create_directory("{$approot}/{$dir}") &&
+					$this->file_chown("{$approot}/{$dir}", $opts['user'] ?? $this->username)
 				) || warn("failed to create application directory `%s/%s'", $docroot, $dir);
 			}
 
@@ -247,7 +247,7 @@
 			$this->setInterpreter($docroot, $nodeVersion);
 
 			$wrapper->node_do($nodeVersion, null, 'npm install -g --production knex-migrator');
-			$ret = $wrapper->node_do($nodeVersion, "${approot}/current", 'knex-migrator init', [], ['NODE_ENV' => 'production']);
+			$ret = $wrapper->node_do($nodeVersion, "{$approot}/current", 'knex-migrator init', [], ['NODE_ENV' => 'production']);
 			if (!$ret['success']) {
 				return error('Failed to create initial database configuration - knex-migrator failed: %s',
 					$ret['stdout']);
@@ -431,17 +431,17 @@
 		 */
 		private function fixSymlink(string $approot): bool
 		{
-			$path = $this->domain_fs_path("${approot}/current");
+			$path = $this->domain_fs_path("{$approot}/current");
 			clearstatcache(true, $path);
 			if (!is_link($path)) {
-				return error("${approot}/current missing - can't relink");
+				return error("{$approot}/current missing - can't relink");
 			}
 			$link = readlink($path);
 			if ($link[0] !== '/') {
 				// relative link
-				$stat = $this->file_stat("${approot}/current");
+				$stat = $this->file_stat("{$approot}/current");
 
-				return !empty($stat['referent']) ? true : error("${approot}/current does not point to an active Ghost install");
+				return !empty($stat['referent']) ? true : error("{$approot}/current does not point to an active Ghost install");
 			}
 
 			if (0 !== strpos($link, $approot)) {
@@ -463,7 +463,7 @@
 		 */
 		private function fixThemeLink(string $approot): bool
 		{
-			$path = $this->domain_fs_path("${approot}/content/themes");
+			$path = $this->domain_fs_path("{$approot}/content/themes");
 			if (!file_exists($path)) {
 				return warn('Cannot correct theme symlinks, cannot find theme path');
 			}
@@ -472,14 +472,14 @@
 				if ($file === '.' || $file === '..') {
 					continue;
 				}
-				if (!is_link("${path}/${file}")) {
+				if (!is_link("{$path}/{$file}")) {
 					continue;
 				}
-				$link = readlink("${path}/${file}");
+				$link = readlink("{$path}/{$file}");
 				if (0 !== strpos($link . '/', Web_Module::MAIN_DOC_ROOT . '/')) {
 					continue;
 				}
-				$localpath = $this->file_unmake_path("${path}/${file}");
+				$localpath = $this->file_unmake_path("{$path}/{$file}");
 				$this->file_delete($localpath) && $this->file_symlink($approot . substr($link,
 						strlen(Web_Module::MAIN_DOC_ROOT)),
 					$localpath);
@@ -515,11 +515,11 @@
 		 */
 		private function linkConfiguration(string $approot, string $appenv = 'production'): bool
 		{
-			$this->file_delete($approot . "/current/config.${appenv}.json");
+			$this->file_delete($approot . "/current/config.{$appenv}.json");
 
-			return $this->file_symlink($approot . "/config.${appenv}.json",
-					$approot . "/current/config.${appenv}.json") ||
-				warn("failed to link configuration ${approot}/config.${appenv}.json to current/");
+			return $this->file_symlink($approot . "/config.{$appenv}.json",
+					$approot . "/current/config.{$appenv}.json") ||
+				warn("failed to link configuration {$approot}/config.{$appenv}.json to current/");
 		}
 
 		/**
@@ -533,7 +533,7 @@
 		{
 			$this->linkConfiguration($approot, $appenv);
 			$this->_exec("$approot/current", 'which knex-migrator > /dev/null || npm install --no-dev -g knex-migrator');
-			$ret = $this->_exec("${approot}/current", 'knex-migrator migrate');
+			$ret = $this->_exec("{$approot}/current", 'knex-migrator migrate');
 
 			return $ret['success'] ?: error("failed to migrate database in `%s': %s", $approot,
 				coalesce($ret['stdout'], $ret['stderr']));
@@ -635,7 +635,7 @@
 				return [];
 			}
 			foreach (['development', 'production'] as $env) {
-				$path = "${approot}/config.${env}.json";
+				$path = "{$approot}/config.{$env}.json";
 				if ($this->file_exists($path)) {
 					// @todo unify config into a consistent object
 					$json = json_decode($this->file_get_file_contents($path), true)['database']['connection'];
@@ -770,7 +770,7 @@
 			$args['version'] = $version;
 			$ret = $this->_exec($approot, $cmd, $args);
 			$this->fixSymlink($approot);
-			$this->file_touch("${approot}/tmp/restart.txt");
+			$this->file_touch("{$approot}/tmp/restart.txt");
 			if (!$ret['success']) {
 				$this->setInfo($this->getDocumentRoot($hostname, $path), [
 					'version' => $this->get_version($hostname, $path),
