@@ -42,7 +42,7 @@
 			'4.6'   => '14.16.1',
 			'4.21'  => '14.18.0',
 			'5.0'   => '16.19',
-			'5.30'  => '18.12',
+			'5.30'  => '18.12.1',
 		];
 
 		public function plugin_status(string $hostname, string $path = '', string $plugin = null)
@@ -59,7 +59,6 @@
 		{
 			return error('not supported');
 		}
-
 
 		public function restart(string $hostname, string $path = ''): bool
 		{
@@ -229,7 +228,6 @@
 				) || warn("failed to create application directory `%s/%s'", $docroot, $dir);
 			}
 
-
 			$this->linkConfiguration($approot, 'production');
 
 			if (!$wrapper->file_put_file_contents($docroot . '/.htaccess',
@@ -262,6 +260,11 @@
 			]);
 
 			$this->notifyInstalled($hostname, $path, $opts);
+
+			try {
+				// throws 503 as it boots up, boot up populates new settings into db...
+				(new \HTTP\SelfReferential($hostname, $this->site_ip_address()))->get($path);
+			} catch (\GuzzleHttp\Exception\RequestException) { }
 
 			return info('%(app)s installed - confirmation email with login info sent to %(email)s',
 				['app' => static::APP_NAME, 'email' => $opts['email']]);
@@ -532,9 +535,8 @@
 		private function migrate(string $approot, string $appenv = 'production'): bool
 		{
 			$this->linkConfiguration($approot, $appenv);
-			$this->_exec("$approot/current", 'which knex-migrator > /dev/null || npm install --no-dev -g knex-migrator');
-			$ret = $this->_exec("{$approot}/current", 'knex-migrator migrate');
-
+			$this->_exec("$approot/current", 'knex-migrator -v || npm install --no-optional knex-migrator');
+			$ret = $this->_exec("$approot/current", 'knex-migrator migrate');
 			return $ret['success'] ?: error("failed to migrate database in `%s': %s", $approot,
 				coalesce($ret['stdout'], $ret['stderr']));
 		}
@@ -739,27 +741,31 @@
 					'new' => $nodeVersion,
 					'ghostver' => $version
 				]);
+
+				$wrapper = $this->getApnscpFunctionInterceptorFromDocroot($docroot);
+				$wrapper->node_make_default($nodeVersion, $approot);
+
 				// @TODO bounce Apache?
 				defer($_, fn() => $this->setInterpreter($this->getDocumentRoot($hostname, $path), $nodeVersion));
 			}
 
-			if (\Opcenter\Versioning::asMajor($version) !== \Opcenter\Versioning::asMajor($oldversion)) {
+			if (\Opcenter\Versioning::asMajor($version) !== \Opcenter\Versioning::asMajor($oldversion))
+			{
 				// newer ghost-cli are sudo-happy
-				if (!$this->_exec($approot, 'ghost update %s --local --no-restart --no-color --v%d',
-					[
-						null,
-						\Opcenter\Versioning::asMajor($oldversion)
-					])) {
-					return error('Failed to prep for major version upgrade');
+				$ret = $this->_exec($approot, 'ghost update %s --local --no-restart --no-color v%d', [
+					null,
+					(int)\Opcenter\Versioning::asMajor($oldversion)
+				]);
+				if (!$ret['success']) {
+					return error('Ghost upgrade must be manually completed. Run the following command to use the migration assistant: ' .
+						'cd %s && NODE_ENV=production nvm exec ghost update --local -f', $approot);
 				}
-
-				return error('Ghost upgrade must be manually completed. Run the following command to use the migration assistant: ' .
-					'cd %s && NODE_ENV=production nvm exec ghost update --local -f', $approot);
+			} else {
+				// force version assertion on incomplete upgrade
+				$this->assertLocalVersion($approot, $oldversion, $version);
 			}
-			// force version assertion on incomplete upgrade
-			$this->assertLocalVersion($approot, $oldversion, $version);
-			// more bad permission requirements, -D bypasses chmod requirement
 
+			// more bad permission requirements, -D bypasses chmod requirement
 			$cmd = 'ghost update %(debug)s --no-restart --local --no-prompt --no-color %(version)s';
 			// disable debug mode for now, causes stdout maxBuffer exceeded error
 			if (is_debug()) {
@@ -769,6 +775,7 @@
 			$args['debug'] = null;
 			$args['version'] = $version;
 			$ret = $this->_exec($approot, $cmd, $args);
+
 			$this->fixSymlink($approot);
 			$this->file_touch("{$approot}/tmp/restart.txt");
 			if (!$ret['success']) {
@@ -778,8 +785,12 @@
 				]);
 
 				$this->assertLocalVersion($approot, $oldversion, $version);
-
-				return error('failed to update Ghost: %s', coalesce($ret['stderr'], $ret['stdout']));
+				$output = coalesce($ret['stderr'], $ret['stdout']);
+				if (str_contains($output, 'has been deprecated with ')) {
+					return warn("Release %(version)s is deprecated pending upstream acknowledgement. " .
+						"Update has not been applied and will be skipped.", ['version' => $version]);
+				}
+				return error('failed to update Ghost: %s', $output);
 			}
 
 			$ret = $this->migrate($approot) && ($this->kill($hostname, $path) || true);
