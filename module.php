@@ -205,6 +205,8 @@
 			$config = [
 				'useMinFiles'              => 'true',
 				'caching.frontend.maxAge'  => 120,
+				// prevent double encoding
+				'compress'                 => 'false',
 				'logging.rotation.enabled' => 'true',
 				'mail.transport'           => 'sendmail',
 				// frontend caches + leave 5 for update/admin
