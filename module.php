@@ -43,7 +43,10 @@
 			'4.21'  => '14.18.0',
 			'5.0'   => '16.19',
 			'5.30'  => '18.12.1',
+			'6.0'   => '22.13.1',
 		];
+
+		private const NODE_GYP_PYTHON_MAJOR = 3;
 
 		public function plugin_status(string $hostname, string $path = '', string $plugin = null)
 		{
@@ -160,13 +163,31 @@
 				warn("Disabling debug mode as it causes a maxBuffer exceeded error");
 				$args['debug'] = null;
 			}
+
 			// use localhost.localdomain, which is an alias to 127.0.0.1;
 			// ghost looks for "mysqld" if dbhost is localhost or 127.0.0.1;
 			// this isn't present in a synthetic root
-			$ret = $this->_exec($docroot,
-				'ghost install %(debug)s --process=local --no-prompt --no-stack --no-start --no-color --db=%(dbkind)s --dbhost=%(dbhost)s --dbuser=%(dbuser)s --dbpass=%(dbpassword)s ' .
-				'--dbname=%(dbname)s --no-setup-linux-user --no-setup-nginx --url=%(proto)s%(uri)s --mail=sendmail %(version)s',
-				$args);
+			$installCommand = 'ghost install %(debug)s --process=local --no-prompt --no-stack --no-start --no-color --db=%(dbkind)s --dbhost=%(dbhost)s --dbuser=%(dbuser)s --dbpass=%(dbpassword)s ' .
+				'--dbname=%(dbname)s --no-setup-linux-user --no-setup-nginx --url=%(proto)s%(uri)s --mail=sendmail %(version)s';
+
+			$env = [
+				'PYENV_VERSION'            => (string)self::NODE_GYP_PYTHON_MAJOR,
+				'PYTHON'                   => '/usr/local/share/python/pyenv/shims/python',
+				'GHOST_NODE_VERSION_CHECK' => 'false',
+			];
+
+			$ret = $this->_exec($docroot, $installCommand, $args, $env);
+
+			if (!$ret['success'] && str_contains($ret['stderr'], "The verification has failed: building from sources")) {
+				// GLIBC error
+				if (!$this->handleGypBuild()) {
+					return error('failed to download Ghost v%s: %s - possibly out of storage space?', $args['version'],
+						$ret['stdout']);
+				}
+				$db->rollback();
+				debug("Retrying install after satisfying node-gyp Python requirements");
+				return $this->install($hostname, $path, ['empty' => true] + $opts);
+			}
 
 			if (!$ret['success']) {
 				info('removing temporary files');
@@ -297,6 +318,7 @@
 				$afi = \apnscpFunctionInterceptor::factory(Auth::context($user, $this->site));
 			}
 			$wrapper = $afi ?? $this;
+
 			$nodeVersion = \Opcenter\Versioning::satisfy($version, self::NODE_VERSIONS);
 			foreach ([\Opcenter\Versioning::asMajor($nodeVersion), $nodeVersion] as $testVersion) {
 				if (($chk = $wrapper->node_installed($testVersion)) && version_compare($chk, $nodeVersion, '>='))
@@ -342,7 +364,8 @@
 				$cmd,
 				$args,
 				$env + [
-					'NODE_ENV' => 'production'
+					'NODE_ENV' => 'production',
+					'MAKEFLAGS' => '-j1'
 				]);
 			if (!strncmp(coalesce($ret['stderr'], $ret['stdout']), 'Error:', strlen('Error:'))) {
 				// move stdout to stderr on error for consistency
@@ -607,7 +630,11 @@
 		public function get_admin(string $hostname, string $path = ''): ?string
 		{
 			$mysql = $this->connectDB($hostname, $path);
-			$rs = $mysql->query('SELECT email FROM users WHERE id = 1');
+			$query = 'SELECT email FROM users WHERE id = 1';
+			if (Opcenter\Versioning::compare($this->get_version($hostname, $path), '6.0', '>=')) {
+				$query = 'SELECT email FROM users JOIN roles_users ON (users.id = roles_users.user_id) JOIN roles ON (roles_users.role_id = roles.id);';
+			}
+			$rs = $mysql->query($query);
 			if (!$rs || $rs->num_rows < 1) {
 				return null;
 			}
@@ -751,13 +778,19 @@
 				defer($_, fn() => $this->setInterpreter($this->getDocumentRoot($hostname, $path), $nodeVersion));
 			}
 
+			$env = [
+				'GHOST_NODE_VERSION_CHECK' => 'false',
+				'PYENV_VERSION' => (string)self::NODE_GYP_PYTHON_MAJOR,
+				'PYTHON'        => '/usr/local/share/python/pyenv/shims/python'
+			];
+
 			if (\Opcenter\Versioning::asMajor($version) !== \Opcenter\Versioning::asMajor($oldversion))
 			{
 				// newer ghost-cli are sudo-happy
 				$ret = $this->_exec($approot, 'ghost update %s --local --no-restart --no-color v%d', [
 					null,
 					(int)\Opcenter\Versioning::asMajor($oldversion)
-				]);
+				], $env);
 				if (!$ret['success']) {
 					return error('Ghost upgrade must be manually completed. Run the following command to use the migration assistant: ' .
 						'cd %s && NODE_ENV=production nvm exec ghost update --local -f', $approot);
@@ -776,7 +809,7 @@
 
 			$args['debug'] = null;
 			$args['version'] = $version;
-			$ret = $this->_exec($approot, $cmd, $args);
+			$ret = $this->_exec($approot, $cmd, $args, $env);
 
 			$this->fixSymlink($approot);
 			$this->file_touch("{$approot}/tmp/restart.txt");
@@ -961,5 +994,26 @@
 		public function unfortify(string $hostname, string $path = ''): bool
 		{
 			return error('not implemented');
+		}
+
+		/**
+		 * @return bool retry process
+		 */
+		private function handleGypBuild(): bool
+		{
+			// node-gyp fails GLIBC signature
+			// stack Error: Could not find any Python installation to use
+			$versions = $this->python_list();
+			foreach ($versions as $version) {
+				if (str_starts_with($version, self::NODE_GYP_PYTHON_MAJOR . '.')) {
+					return false;
+				}
+			}
+			$regex = '/^' . self::NODE_GYP_PYTHON_MAJOR . '(.\d+){2}$/';
+			$version = array_first(array_reverse($this->python_get_available()), fn($x) =>
+				str_starts_with($x, (string)self::NODE_GYP_PYTHON_MAJOR) && preg_match($regex, $x));
+
+			// @TODO future incompatibilities with EL7/8?
+			return (bool)$this->python_install($version);
 		}
 	}
