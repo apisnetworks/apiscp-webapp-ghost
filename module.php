@@ -44,6 +44,7 @@
 			'5.0'   => '16.19',
 			'5.30'  => '18.12.1',
 			'6.0'   => '22.13.1',
+			'6.46'  => '22.18.0',
 		];
 
 		private const NODE_GYP_PYTHON_MAJOR = 3;
@@ -270,6 +271,9 @@
 			$wrapper->node_do($nodeVersion, null, 'npm install -g --production knex-migrator');
 			$ret = $wrapper->node_do($nodeVersion, "{$approot}/current", 'knex-migrator init', [], ['NODE_ENV' => 'production']);
 			if (!$ret['success']) {
+				if (empty($opts['keep'])) {
+					$db->rollback();
+				}
 				return error('Failed to create initial database configuration - knex-migrator failed: %s',
 					$ret['stdout']);
 			}
@@ -1014,6 +1018,7 @@
 				str_starts_with($x, (string)self::NODE_GYP_PYTHON_MAJOR) && preg_match($regex, $x));
 
 			// @TODO future incompatibilities with EL7/8?
-			return (bool)$this->python_install($version);
+			$ret = $this->python_install($version);;
+			return (bool)$ret;
 		}
 	}
