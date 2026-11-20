@@ -1014,7 +1014,7 @@
 				}
 			}
 			$regex = '/^' . self::NODE_GYP_PYTHON_MAJOR . '(.\d+){2}$/';
-			$version = array_first(array_reverse($this->python_get_available()), fn($x) =>
+			$version = \Illuminate\Support\Arr::first(array_reverse($this->python_get_available()), fn($x) =>
 				str_starts_with($x, (string)self::NODE_GYP_PYTHON_MAJOR) && preg_match($regex, $x));
 
 			// @TODO future incompatibilities with EL7/8?
